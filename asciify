@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""asciify: turn an image into ASCII art for fastfetch."""
+import argparse
+import os
+from PIL import Image
+
+
+def to_ascii(path, width, threshold, char, invert):
+    img = Image.open(path).convert("RGBA")
+    bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+    gray = Image.alpha_composite(bg, img).convert("L")
+
+    # terminal characters are about 2x taller than wide, so halve the height
+    height = max(1, round(gray.height / gray.width * width * 0.5))
+    gray = gray.resize((width, height), Image.LANCZOS)
+    px = gray.load()
+
+    rows = []
+    for y in range(height):
+        row = ""
+        for x in range(width):
+            dark = px[x, y] < threshold
+            row += char if (dark ^ invert) else " "
+        rows.append(row.rstrip())
+
+    while rows and not rows[0]:
+        rows.pop(0)
+    while rows and not rows[-1]:
+        rows.pop()
+    return rows
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Image to ASCII for fastfetch")
+    ap.add_argument("image", help="input image (PNG, JPG, ...)")
+    ap.add_argument("-w", "--width", type=int, default=34, help="width in columns (default 34)")
+    ap.add_argument("-t", "--threshold", type=int, default=128, help="0-255, darker than this = filled")
+    ap.add_argument("-c", "--char", default="@", help="character to draw with (default @)")
+    ap.add_argument("--invert", action="store_true", help="swap filled and empty")
+    ap.add_argument("--color", default="97", help="ANSI color code, 97 = bright white, 0 = none")
+    ap.add_argument("-o", "--out", help="write to file instead of stdout")
+    a = ap.parse_args()
+
+    rows = to_ascii(a.image, a.width, a.threshold, a.char, a.invert)
+    if a.color != "0":
+        rows = [f"\x1b[{a.color}m{r}\x1b[0m" for r in rows]
+    text = "\n".join(rows) + "\n"
+
+    if a.out:
+        with open(os.path.expanduser(a.out), "w", encoding="utf-8") as f:
+            f.write(text)
+    else:
+        print(text, end="")
+
+
+if __name__ == "__main__":
+    main()
