@@ -12,7 +12,7 @@ install -m 755 asciify ~/.local/bin/asciify
 ## Usage
 
 ```bash
-asciify logo.png -w 34 -o ~/.config/fastfetch/logo.txt
+asciify your-image.png -w 34 -o ~/.config/fastfetch/logo.txt
 fastfetch --logo ~/.config/fastfetch/logo.txt
 ```
 
