@@ -5,10 +5,10 @@ import os
 from PIL import Image
 
 
-def to_ascii(path, width, threshold, char, invert):
+def to_ascii(path, width, threshold, char, invert, bg):
     img = Image.open(path).convert("RGBA")
-    bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
-    gray = Image.alpha_composite(bg, img).convert("L")
+    back = (0, 0, 0, 255) if bg == "black" else (255, 255, 255, 255)
+    gray = Image.alpha_composite(Image.new("RGBA", img.size, back), img).convert("L")
 
     # terminal characters are about 2x taller than wide, so halve the height
     height = max(1, round(gray.height / gray.width * width * 0.5))
@@ -19,8 +19,9 @@ def to_ascii(path, width, threshold, char, invert):
     for y in range(height):
         row = ""
         for x in range(width):
-            dark = px[x, y] < threshold
-            row += char if (dark ^ invert) else " "
+            v = px[x, y]
+            lit = v > threshold if bg == "black" else v < threshold
+            row += char if (lit ^ invert) else " "
         rows.append(row.rstrip())
 
     while rows and not rows[0]:
@@ -34,14 +35,16 @@ def main():
     ap = argparse.ArgumentParser(description="Image to ASCII for fastfetch")
     ap.add_argument("image", help="input image (PNG, JPG, ...)")
     ap.add_argument("-w", "--width", type=int, default=34, help="width in columns (default 34)")
-    ap.add_argument("-t", "--threshold", type=int, default=128, help="0-255, darker than this = filled")
+    ap.add_argument("-t", "--threshold", type=int, default=128, help="0-255 brightness cutoff")
     ap.add_argument("-c", "--char", default="@", help="character to draw with (default @)")
+    ap.add_argument("--bg", choices=["black", "white"], default="black",
+                    help="background behind transparent pixels (default black)")
     ap.add_argument("--invert", action="store_true", help="swap filled and empty")
     ap.add_argument("--color", default="97", help="ANSI color code, 97 = bright white, 0 = none")
     ap.add_argument("-o", "--out", help="write to file instead of stdout")
     a = ap.parse_args()
 
-    rows = to_ascii(a.image, a.width, a.threshold, a.char, a.invert)
+    rows = to_ascii(a.image, a.width, a.threshold, a.char, a.invert, a.bg)
     if a.color != "0":
         rows = [f"\x1b[{a.color}m{r}\x1b[0m" for r in rows]
     text = "\n".join(rows) + "\n"
